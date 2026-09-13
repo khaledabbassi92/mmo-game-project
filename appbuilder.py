@@ -16,25 +16,24 @@ with open(config_path, "r") as f:
 compiler = "g++"
 
 # --------------------------------------------------
-# Front-end source files (ALL 3 FILES)
+# Front-end source files (Dynamically read from folder)
 # --------------------------------------------------
 
 frontend_dir = os.path.join(project_root, "front-end")
-
-main_file  = os.path.join(frontend_dir, "main.cpp")
-gui_file   = os.path.join(frontend_dir, "gui.cpp")
-world_file = os.path.join(frontend_dir, "world.cpp")  # <--- WAS MISSING!
-
 output_exe = os.path.join(project_root, "output.exe")
 
-# Base command with C++17 and all source files
+frontend_source_files = []
+if os.path.exists(frontend_dir):
+    for filename in os.listdir(frontend_dir):
+        if filename.endswith(".cpp"):
+            frontend_source_files.append(os.path.join(frontend_dir, filename))
+
+# Base command with C++17 and all frontend source files found
 cmd = [
     compiler,
-    "-std=c++17",
-    main_file,
-    gui_file,
-    world_file,                                       # <--- Added
-    f"-I{frontend_dir}"                               # <--- Include core.h
+    "-std=c++17"
+] + frontend_source_files + [
+    f"-I{frontend_dir}"                    # <--- Include core.h
 ]
 
 # --------------------------------------------------
@@ -80,7 +79,7 @@ imgui_inc = os.path.join(
 imgui_backends_inc = os.path.join(project_root, "libraries", "imgui", "backends")
 
 cmd.append(f"-I{imgui_inc}")
-cmd.append(f"-I{imgui_backends_inc}")                 # <--- Fixes imgui_impl_sdl3.h not found
+cmd.append(f"-I{imgui_backends_inc}")                   # <--- Fixes imgui_impl_sdl3.h not found
 
 # Add ImGui source files
 for src in imgui_cfg.get("source", []):
@@ -124,9 +123,8 @@ def build():
     print("=" * 60)
     print("Project root:", project_root)
     print("\nSource files:")
-    print("  ->", main_file)
-    print("  ->", gui_file)
-    print("  ->", world_file)
+    for src_file in frontend_source_files:
+        print("  ->", src_file)
     print("\nCompiler command:\n", " ".join(cmd))
     print("-" * 60)
 

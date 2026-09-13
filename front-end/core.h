@@ -1,25 +1,41 @@
-// ============================================================================
-// core.h - Sole Intermediary Header (SDL3 + OpenGL3)
-// ============================================================================
 #pragma once
 
-#include <SDL3/SDL.h>
+enum class GameState {
+    Login,
+    Playing,
+    Options
+};
 
-// --- GUI Subsystem (implemented in gui.cpp) ---
-bool GUI_Init(int width = 1280, int height = 720, const char* title = "MMO Client - 2D World (SDL3/OpenGL3)");
-bool GUI_IsRunning();
-void GUI_BeginFrame();
-void GUI_EndFrame();
-void GUI_Shutdown();
+GameState Core_GetState();
+void Core_SetState(GameState state);
 
-float GUI_GetDeltaTime();
-void GUI_GetWindowSize(int* w, int* h);
-const bool* GUI_GetKeyboardState();
-bool GUI_IsConnectPressed();
+struct World {
+    bool world_isSpawned = false;
+    void spawnWorld();
+    void despawnWorld();
+    void renderWorld();
+};
 
-// --- World Subsystem (implemented in world.cpp) ---
-void World_Spawn(float spawnX = 1000.0f, float spawnY = 1000.0f);
-void World_Despawn();
-bool World_IsSpawned();
-void World_Update(float deltaTime);
-void World_Render();
+struct Camera {};
+struct Players {};
+struct Mobs {};
+struct WorldAssets {};
+
+World& Core_GetWorld();
+Camera& Core_GetCamera();
+Players& Core_GetPlayers();
+Mobs& Core_GetMobs();
+WorldAssets& Core_GetWorldAssets();
+void Core_Update(float deltaTime);
+
+// Renderer / Window Function Declarations
+bool Renderer_Init(int width, int height, const char* title);
+bool Renderer_IsRunning();
+void Renderer_BeginFrame();
+void Renderer_EndFrame();
+void Renderer_Shutdown();
+float Renderer_GetDeltaTime();
+
+// UI Function Declarations
+void DrawLoginWindow();
+bool UI_IsConnectPressed();
