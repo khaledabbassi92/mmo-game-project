@@ -104,15 +104,13 @@ void Renderer_BeginFrame()
 
 void Renderer_EndFrame()
 {
-    GameState current_state = Core_GetState();
-
     switch (current_state)
     {
         case GameState::Login:
             DrawLoginWindow();
             break;
         case GameState::Playing:
-            Core_GetWorld().renderWorld();
+            world.renderWorld();
             break;
         case GameState::Options:
             break;

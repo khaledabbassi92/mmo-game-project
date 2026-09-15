@@ -15,7 +15,7 @@ int main(int argc, char* argv[])
         if (UI_IsConnectPressed())
         {
             std::cout << "[Main] Connect pressed. Spawning world." << std::endl;
-            Core_GetWorld().spawnWorld();
+            world.spawnWorld();
         }
 
         Core_Update(Renderer_GetDeltaTime());
@@ -25,4 +25,3 @@ int main(int argc, char* argv[])
     Renderer_Shutdown();
     return 0;
 }
-
