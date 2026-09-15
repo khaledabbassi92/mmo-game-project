@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 
 enum class GameState {
     Login,
@@ -16,8 +17,32 @@ struct World {
     void renderWorld();
 };
 
-struct Camera {};
+struct Vector2{
+    float x;
+    float y;
+};
+
+struct Camera {
+    Vector2 position;
+    int width;
+    int height;
+    float zoom;
+};
+
 struct Players {};
+
+struct MainPlayer {
+    int id;
+    std::string username;
+    Vector2 position;
+    int level;
+    int health;
+    int maxHealth;
+    int experience;
+    int animation;
+    bool connected;
+};
+
 struct Mobs {};
 struct WorldAssets {};
 
@@ -39,3 +64,9 @@ float Renderer_GetDeltaTime();
 // UI Function Declarations
 void DrawLoginWindow();
 bool UI_IsConnectPressed();
+
+// Player & Camera Declarations
+MainPlayer& Core_GetMainPlayer();
+void Camera_Update(float deltaTime);
+void MainPlayer_Update(float deltaTime);
+void MainPlayer_Render();

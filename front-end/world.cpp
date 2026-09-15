@@ -1,5 +1,6 @@
 #include "core.h"
 #include <imgui.h>
+#include <SDL3/SDL.h>
 
 static GameState current_state = GameState::Login;
 static World world;
@@ -21,7 +22,8 @@ void Core_Update(float deltaTime)
 {
     if (current_state == GameState::Playing)
     {
-        // Update simulation systems here
+        MainPlayer_Update(deltaTime);
+        Camera_Update(deltaTime);
     }
 }
 
@@ -43,8 +45,13 @@ void World::renderWorld()
 {
     if (current_state != GameState::Playing) return;
 
+    Camera& cam = Core_GetCamera();
+    cam.width = 900;
+    cam.height = 600;
+    if (cam.zoom <= 0.0f) cam.zoom = 1.0f;
+
     ImGui::Begin("World Simulation");
-    ImGui::Text("Active Simulation Space");
+    ImGui::Text("Player Pos: (%.1f, %.1f)", Core_GetMainPlayer().position.x, Core_GetMainPlayer().position.y);
     
     if (ImGui::Button("Disconnect / Return to Login"))
     {
@@ -52,4 +59,6 @@ void World::renderWorld()
     }
 
     ImGui::End();
+
+    MainPlayer_Render();
 }
