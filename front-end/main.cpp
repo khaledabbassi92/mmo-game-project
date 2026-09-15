@@ -16,6 +16,7 @@ int main(int argc, char* argv[])
         {
             std::cout << "[Main] Connect pressed. Spawning world." << std::endl;
             world.spawnWorld();
+			std::cout <<"Currnet state: " << static_cast<int>(current_state) << std::endl;
         }
 
         Core_Update(Renderer_GetDeltaTime());

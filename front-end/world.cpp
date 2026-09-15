@@ -1,6 +1,7 @@
 #include "core.h"
 #include <imgui.h>
 #include <SDL3/SDL.h>
+#include <iostream>
 
 void World::spawnWorld()
 {
@@ -30,6 +31,7 @@ void World::renderWorld()
     if (ImGui::Button("Disconnect / Return to Login"))
     {
         despawnWorld();
+		std::cout <<"Currnet state: " << static_cast<int>(current_state) << std::endl;
     }
 
     ImGui::End();
