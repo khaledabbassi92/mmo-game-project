@@ -6,7 +6,7 @@ Camera camera = { {0.0f, 0.0f}, 1280, 720, 1.0f };
 Players players;
 Mobs mobs;
 WorldAssets worldAssets;
-MainPlayer mainPlayer = { 1, "Player1", {0.0f, 0.0f}, 1, 100, 100, 0, 0, false };
+MainPlayer mainPlayer = { 1, "Player1", {0.0f, 0.0f}, 1, 100, 100, 0, 0, true };
 
 GameState Core_GetState() { return current_state; }
 void Core_SetState(GameState state) { current_state = state; }
@@ -24,5 +24,6 @@ void Core_Update(float deltaTime)
     {
         MainPlayer_Update(deltaTime);
         Camera_Update(deltaTime);
+
     }
 }

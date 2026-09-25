@@ -43,6 +43,19 @@ struct MainPlayer {
 struct Mobs {};
 struct WorldAssets {};
 
+// NETWORK
+
+bool Addplayertoserver();
+
+bool TCP_Connect();
+void TCP_Disconnect();
+bool SendMainPlayerObject();
+
+bool UDP_Connect();
+void UDP_Disconnect();
+
+void UpdatePlayerPosition(float deltaTime);
+
 // Direct global variables (extern declaration for cross-file access)
 extern GameState current_state;
 extern World world;
@@ -53,6 +66,15 @@ extern WorldAssets worldAssets;
 extern MainPlayer mainPlayer;
 
 void Core_Update(float deltaTime);
+GameState Core_GetState();
+void Core_SetState(GameState state);
+
+World& Core_GetWorld();
+Camera& Core_GetCamera();
+Players& Core_GetPlayers();
+Mobs& Core_GetMobs();
+WorldAssets& Core_GetWorldAssets();
+MainPlayer& Core_GetMainPlayer();
 
 // Renderer / Window Function Declarations
 bool Renderer_Init(int width, int height, const char* title);
