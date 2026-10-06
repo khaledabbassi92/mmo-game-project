@@ -3,52 +3,52 @@
 
 int main(int argc, char* argv[])
 {
-    if (!Renderer_Init(900, 600, "MMO Game"))
+    // Initialize graphics, SDL3 window, and OpenGL context
+    if (!Renderer_Init(1280, 720, "2D MMO Engine - Core Architecture"))
     {
-        return 1;
+        std::cerr << "[Fatal Error] Failed to initialize rendering context." << std::endl;
+        return -1;
     }
 
+    std::cout << "[Engine] Renderer and ImGui initialized successfully.\n";
+
+    // Load world static assets from JSON into core memory
+    if (loadWorldStaticAssets("worldstaticassets.json", Core_GetWorldAssets()))
+    {
+        printWorldStaticAssets(Core_GetWorldAssets());
+        LoadWorldTextures(Core_GetWorldAssets());
+        std::cout << "[Engine] World assets loaded successfully.\n";
+    }
+    else
+    {
+        std::cerr << "[Engine Warning] Failed to load worldstaticassets.json or file missing.\n";
+    }
+
+    std::cout << "[Engine] Starting main loop...\n";
+
+    // Main Engine Loop
     while (Renderer_IsRunning())
     {
-        Renderer_BeginFrame();
+        float deltaTime = Renderer_GetDeltaTime();
 
-        if (UI_IsConnectPressed())
+        // 1. Core Logic Tick
+        Core_Update(deltaTime);
+
+        // 2. Handle State Transitions
+        if (Core_GetState() == GameState::Login)
         {
-            // 1. Establish sockets
-            if ( 1 == 2)
+            if (UI_IsConnectPressed())
             {
-                std::cout << "Connect error" << std::endl;
-            }
-            // 2. Send credentials & wait for handshake
-            else if (!SendLoginRequest())
-            {
-                std::cout << "Authenticated. Spawning world." << std::endl;
-                loadWorldStaticAssets("worldstaticassets.json", worldStaticAssets);
-                printWorldStaticAssets(worldStaticAssets);
-                
-                world.spawnWorld();
-				
-                std::cout << "Current state: " << static_cast<int>(current_state) << std::endl;
-            }
-            // 3. Handle auth failure
-            else
-            {
-                std::cerr << "Authentication failed. Staying on login." << std::endl;
-                TCP_Disconnect();
-                UDP_Disconnect();
+                Core_GetWorld().spawnWorld();
             }
         }
 
-        float deltaTime = Renderer_GetDeltaTime();
-
-        Core_Update(deltaTime);
-        UpdatePlayerPosition(deltaTime);
-
+        // 3. Render Pass
+        Renderer_BeginFrame();
         Renderer_EndFrame();
     }
 
-    TCP_Disconnect();
-    UDP_Disconnect();
+    std::cout << "[Engine] Shutting down clean...\n";
     Renderer_Shutdown();
 
     return 0;

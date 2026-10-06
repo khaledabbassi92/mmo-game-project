@@ -102,8 +102,45 @@ void Renderer_BeginFrame()
     ImGui::NewFrame();
 }
 
+// Submits a 2D textured quad (4 vertices / 2 triangles) to the GPU
+void Render_DrawSprite(unsigned int textureID, float x, float y, float scale)
+{
+    if (textureID == 0) return;
+
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glPushMatrix();
+    glTranslatef(x, y, 0.0f);
+    glScalef(scale, scale, 1.0f);
+
+    // Reduced base radius (or use scale directly from JSON)
+    float baseSize = 0.1f; 
+
+    glBegin(GL_QUADS);
+        glTexCoord2f(0.0f, 0.0f); glVertex2f(-baseSize, -baseSize);
+        glTexCoord2f(1.0f, 0.0f); glVertex2f( baseSize, -baseSize);
+        glTexCoord2f(1.0f, 1.0f); glVertex2f( baseSize,  baseSize);
+        glTexCoord2f(0.0f, 1.0f); glVertex2f(-baseSize,  baseSize);
+    glEnd();
+
+    glPopMatrix();
+    glDisable(GL_TEXTURE_2D);
+}
+
 void Renderer_EndFrame()
 {
+    // 1. Clear Screen
+    int drawableW = 0, drawableH = 0;
+    SDL_GetWindowSizeInPixels(window, &drawableW, &drawableH);
+    glViewport(0, 0, drawableW, drawableH);
+    glClearColor(25.0f / 255.0f, 25.0f / 255.0f, 30.0f / 255.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    // 2. Render Active State Game Geometry
     switch (current_state)
     {
         case GameState::Login:
@@ -111,20 +148,17 @@ void Renderer_EndFrame()
             break;
         case GameState::Playing:
             world.renderWorld();
+			DrawHUD();
             break;
         case GameState::Options:
             break;
     }
 
+    // 3. Draw ImGui UI Overlays
     ImGui::Render();
-
-    int drawableW = 0, drawableH = 0;
-    SDL_GetWindowSizeInPixels(window, &drawableW, &drawableH);
-    glViewport(0, 0, drawableW, drawableH);
-    glClearColor(25.0f / 255.0f, 25.0f / 255.0f, 30.0f / 255.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+    // 4. Swap Double Buffers
     SDL_GL_SwapWindow(window);
 }
 

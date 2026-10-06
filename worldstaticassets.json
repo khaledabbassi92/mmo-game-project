@@ -2,15 +2,17 @@
   {
     "type": 1,
     "meshId": 0,
-    "position": { "x": 10.5, "y": -3.2 },
-    "scale": 1.2,
-    "flags": [1, 0, 4, 16, 32]
+    "position": { "x": 0, "y": 100 },
+    "scale": 5,
+    "flags": [1, 0, 4, 16, 32],
+    "textureId": "assets/world/tree1.png"
   },
   {
     "type": 5,
     "meshId": 1,
     "position": { "x": 42.0, "y": 0.0 },
     "scale": 0.8,
-    "flags": [2, 8, 64, 128]
+    "flags": [2, 8, 64, 128],
+    "textureId": "assets/world/tree1.png"
   }
 ]

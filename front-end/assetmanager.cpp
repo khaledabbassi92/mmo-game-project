@@ -6,7 +6,52 @@
 #include "json.hpp"
 #include "core.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+#if defined(__APPLE__)
+#include <OpenGL/gl.h>
+#else
+#include <GL/gl.h>
+#endif
+
 using json = nlohmann::json;
+
+// Helper to upload a PNG file to VRAM
+static unsigned int LoadTextureToVRAM(const std::string& filePath) {
+    int width, height, channels;
+    stbi_set_flip_vertically_on_load(true); 
+
+    unsigned char* data = stbi_load(filePath.c_str(), &width, &height, &channels, 4);
+    if (!data) {
+        std::cerr << "[AssetManager Error] Failed to load texture at: " << filePath << "\n";
+        return 0;
+    }
+
+    GLuint textureID = 0;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    stbi_image_free(data);
+
+    std::cout << "[AssetManager] Loaded Texture '" << filePath << "' -> GPU Handle: " << textureID << "\n";
+    return textureID;
+}
+
+// Loads OpenGL texture handles into outAssets.textureID
+void LoadWorldTextures(WorldStaticAssets& assets) {
+    for (std::size_t i = 0; i < assets.count; ++i) {
+        if (!assets.texturePath[i].empty()) {
+            assets.textureID[i] = LoadTextureToVRAM(assets.texturePath[i]);
+        } else {
+            assets.textureID[i] = 0;
+        }
+    }
+}
 
 bool loadWorldStaticAssets(const std::string& filePath, WorldStaticAssets& outAssets) {
     std::ifstream file(filePath);
@@ -52,7 +97,6 @@ bool loadWorldStaticAssets(const std::string& filePath, WorldStaticAssets& outAs
         return false;
     }
 
-    // Iterate through each asset object in the root array
     for (const auto& item : j) {
         if (outAssets.count >= MAX_ASSETS) {
             std::cerr << "Warning: Exceeded MAX_ASSETS capacity of " << MAX_ASSETS << "\n";
@@ -61,7 +105,7 @@ bool loadWorldStaticAssets(const std::string& filePath, WorldStaticAssets& outAs
 
         std::size_t idx = outAssets.count;
 
-        // Parse Position
+        // Position
         if (item.contains("position") && item["position"].is_object()) {
             outAssets.position[idx].x = item["position"].value("x", 0.0f);
             outAssets.position[idx].y = item["position"].value("y", 0.0f);
@@ -70,12 +114,19 @@ bool loadWorldStaticAssets(const std::string& filePath, WorldStaticAssets& outAs
             outAssets.position[idx].y = 0.0f;
         }
 
-        // Parse Scale, MeshID, and Type
+        // Metadata
         outAssets.scale[idx]  = item.value("scale", 1.0f);
         outAssets.meshId[idx] = item.value("meshId", 0);
         outAssets.type[idx]   = item.value("type", 0);
 
-        // Parse Flags Array
+        // Texture Path
+        if (item.contains("texturePath")) {
+            outAssets.texturePath[idx] = item.value("texturePath", "");
+        } else {
+            outAssets.texturePath[idx] = item.value("textureId", "");
+        }
+
+        // Flags
         if (item.contains("flags") && item["flags"].is_array()) {
             auto instanceFlags = item["flags"].get<std::vector<int>>();
             std::size_t flagsToCopy = std::min(instanceFlags.size(), static_cast<std::size_t>(MAX_FLAGS_PER_ASSET));
@@ -109,6 +160,7 @@ void printWorldStaticAssets(const WorldStaticAssets& assets) {
         std::cout << "Asset [" << std::setw(3) << i << "] | "
                   << "Type: " << std::setw(3) << assets.type[i] << " | "
                   << "Mesh ID: " << std::setw(4) << assets.meshId[i] << " | "
+                  << "Texture: " << assets.texturePath[i] << " | "
                   << "Pos: (" << std::setw(6) << std::fixed << std::setprecision(2) << assets.position[i].x << ", " 
                              << std::setw(6) << assets.position[i].y << ") | "
                   << "Scale: " << std::setw(4) << assets.scale[i] << " | "

@@ -1,40 +1,45 @@
 #include "core.h"
-#include <imgui.h>
-#include <SDL3/SDL.h>
 #include <iostream>
 
 void World::spawnWorld()
 {
-    if (world_isSpawned) return;
     world_isSpawned = true;
     current_state = GameState::Playing;
+    std::cout << "[World] World spawned! Entering gameplay state.\n";
 }
 
 void World::despawnWorld()
 {
-    if (!world_isSpawned) return;
     world_isSpawned = false;
     current_state = GameState::Login;
+    std::cout << "[World] World despawned! Returning to login screen.\n";
 }
 
 void World::renderWorld()
 {
-    if (current_state != GameState::Playing) return;
+    if (!world_isSpawned) return;
 
-    camera.width = 900;
-    camera.height = 600;
-    if (camera.zoom <= 0.0f) camera.zoom = 1.0f;
+    // 1. Draw all static world assets loaded from JSON
+    Render_WorldStaticAssets(worldStaticAssets);
 
-    ImGui::Begin("World Simulation");
-    ImGui::Text("Player Pos: (%.1f, %.1f)", mainPlayer.position.x, mainPlayer.position.y);
-    
-    if (ImGui::Button("Disconnect / Return to Login"))
-    {
-        despawnWorld();
-		std::cout <<"Currnet state: " << static_cast<int>(current_state) << std::endl;
-    }
-
-    ImGui::End();
-
+    // 2. Render dynamic entities (Player, Mobs, etc.)
     MainPlayer_Render();
+}
+
+// Iterates over all parsed assets and submits GPU draw calls
+void Render_WorldStaticAssets(const WorldStaticAssets& assets)
+{
+    for (std::size_t i = 0; i < assets.count; ++i)
+    {
+        // Skip rendering if no texture was loaded to VRAM for this asset
+        if (assets.textureID[i] == 0) continue;
+
+        // Render quad at position (x, y) with scale
+        Render_DrawSprite(
+            assets.textureID[i],
+            assets.position[i].x,
+            assets.position[i].y,
+            assets.scale[i]
+        );
+    }
 }
