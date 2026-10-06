@@ -1,18 +1,13 @@
+#include "core.h"
 #include <winsock2.h>
 #include <ws2tcpip.h>
-
-#include <vector>
-#include <cstdint>
 #include <iostream>
 #include <cstring>
-
-#include "core.h"
+#include <vector>
 
 #pragma comment(lib, "ws2_32.lib")
 
-static bool winsockInitialized = false;
-
-static bool InitWinsock()
+bool NetworkManager::init()
 {
     if (winsockInitialized)
         return true;
@@ -20,7 +15,7 @@ static bool InitWinsock()
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
     {
-        std::cerr << "[Net] WSAStartup failed: " << WSAGetLastError() << std::endl;
+        std::cerr << "[NetworkManager] WSAStartup failed: " << WSAGetLastError() << std::endl;
         return false;
     }
 
@@ -28,29 +23,25 @@ static bool InitWinsock()
     return true;
 }
 
-static void CleanupWinsock()
+void NetworkManager::shutdown()
 {
+    disconnectTCP();
+    disconnectUDP();
+
     if (winsockInitialized)
     {
         WSACleanup();
         winsockInitialized = false;
+        std::cout << "[NetworkManager] Winsock cleaned up.\n";
     }
 }
 
-// ==================================================
-// TCP
-// ==================================================
-
-static SOCKET tcpSocket = INVALID_SOCKET;
-
-bool TCP_Connect()
+bool NetworkManager::connectTCP(const char* ip, unsigned short port)
 {
-    if (!InitWinsock())
-        return false;
+    if (!init()) return false;
 
-    tcpSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
-    if (tcpSocket == INVALID_SOCKET)
+    tcpSocket = static_cast<uintptr_t>(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+    if (tcpSocket == ~0ULL)
     {
         std::cerr << "[TCP] socket() failed: " << WSAGetLastError() << std::endl;
         return false;
@@ -58,65 +49,53 @@ bool TCP_Connect()
 
     sockaddr_in server{};
     server.sin_family = AF_INET;
-    server.sin_port = htons(4444);
-    inet_pton(AF_INET, "127.0.0.1", &server.sin_addr);
+    server.sin_port = htons(port);
+    inet_pton(AF_INET, ip, &server.sin_addr);
 
-    if (connect(tcpSocket, (sockaddr*)&server, sizeof(server)) == SOCKET_ERROR)
+    if (connect(static_cast<SOCKET>(tcpSocket), (sockaddr*)&server, sizeof(server)) == SOCKET_ERROR)
     {
         std::cerr << "[TCP] connect() failed: " << WSAGetLastError() << std::endl;
-        closesocket(tcpSocket);
-        tcpSocket = INVALID_SOCKET;
+        closesocket(static_cast<SOCKET>(tcpSocket));
+        tcpSocket = ~0ULL;
         return false;
     }
 
+    u_long mode = 1;
+    ioctlsocket(static_cast<SOCKET>(tcpSocket), FIONBIO, &mode);
+
+    std::cout << "[TCP] Connected to " << ip << ":" << port << "\n";
     return true;
 }
 
-bool TCP_Send(const char* data, int size)
+bool NetworkManager::sendTCP(const char* data, int size)
 {
-    if (tcpSocket == INVALID_SOCKET)
-        return false;
+    if (tcpSocket == ~0ULL) return false;
 
-    int sent = send(tcpSocket, data, size, 0);
-    if (sent != size)
-    {
-        std::cerr << "[TCP] send() failed: " << WSAGetLastError() << std::endl;
-        return false;
-    }
-    return true;
+    int sent = send(static_cast<SOCKET>(tcpSocket), data, size, 0);
+    return (sent == size);
 }
 
-int TCP_Receive(char* buffer, int size)
+int NetworkManager::receiveTCP(char* buffer, int size)
 {
-    if (tcpSocket == INVALID_SOCKET)
-        return -1;
-
-    return recv(tcpSocket, buffer, size, 0);
+    if (tcpSocket == ~0ULL) return -1;
+    return recv(static_cast<SOCKET>(tcpSocket), buffer, size, 0);
 }
 
-void TCP_Disconnect()
+void NetworkManager::disconnectTCP()
 {
-    if (tcpSocket != INVALID_SOCKET)
+    if (tcpSocket != ~0ULL)
     {
-        closesocket(tcpSocket);
-        tcpSocket = INVALID_SOCKET;
+        closesocket(static_cast<SOCKET>(tcpSocket));
+        tcpSocket = ~0ULL;
     }
 }
 
-// ==================================================
-// UDP
-// ==================================================
-
-static SOCKET udpSocket = INVALID_SOCKET;
-
-bool UDP_Connect()
+bool NetworkManager::connectUDP(const char* ip, unsigned short port)
 {
-    if (!InitWinsock())
-        return false;
+    if (!init()) return false;
 
-    udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-
-    if (udpSocket == INVALID_SOCKET)
+    udpSocket = static_cast<uintptr_t>(socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
+    if (udpSocket == ~0ULL)
     {
         std::cerr << "[UDP] socket() failed: " << WSAGetLastError() << std::endl;
         return false;
@@ -124,106 +103,76 @@ bool UDP_Connect()
 
     sockaddr_in server{};
     server.sin_family = AF_INET;
-    server.sin_port = htons(4445);
-    inet_pton(AF_INET, "127.0.0.1", &server.sin_addr);
+    server.sin_port = htons(port);
+    inet_pton(AF_INET, ip, &server.sin_addr);
 
-    if (connect(udpSocket, (sockaddr*)&server, sizeof(server)) == SOCKET_ERROR)
+    if (connect(static_cast<SOCKET>(udpSocket), (sockaddr*)&server, sizeof(server)) == SOCKET_ERROR)
     {
         std::cerr << "[UDP] connect() failed: " << WSAGetLastError() << std::endl;
-        closesocket(udpSocket);
-        udpSocket = INVALID_SOCKET;
+        closesocket(static_cast<SOCKET>(udpSocket));
+        udpSocket = ~0ULL;
         return false;
     }
 
+    u_long mode = 1;
+    ioctlsocket(static_cast<SOCKET>(udpSocket), FIONBIO, &mode);
+
+    std::cout << "[UDP] Target set to " << ip << ":" << port << "\n";
     return true;
 }
 
-bool UDP_Send(const char* data, int size)
+bool NetworkManager::sendUDP(const char* data, int size)
 {
-    if (udpSocket == INVALID_SOCKET)
-        return false;
-
-    int sent = send(udpSocket, data, size, 0);
-    if (sent != size)
-    {
-        // Don't spam every frame, only log occasionally if needed
-        return false;
-    }
-    return true;
+    if (udpSocket == ~0ULL) return false;
+    int sent = send(static_cast<SOCKET>(udpSocket), data, size, 0);
+    return (sent == size);
 }
 
-int UDP_Receive(char* buffer, int size)
+int NetworkManager::receiveUDP(char* buffer, int size)
 {
-    if (udpSocket == INVALID_SOCKET)
-        return -1;
-
-    return recv(udpSocket, buffer, size, 0);
+    if (udpSocket == ~0ULL) return -1;
+    return recv(static_cast<SOCKET>(udpSocket), buffer, size, 0);
 }
 
-void UDP_Disconnect()
+void NetworkManager::disconnectUDP()
 {
-    if (udpSocket != INVALID_SOCKET)
+    if (udpSocket != ~0ULL)
     {
-        closesocket(udpSocket);
-        udpSocket = INVALID_SOCKET;
+        closesocket(static_cast<SOCKET>(udpSocket));
+        udpSocket = ~0ULL;
     }
 }
 
-// ==================================================
-// High-level TCP HELPER FUNCTIONS
-// ==================================================
-
-bool SendLoginRequest()
+bool NetworkManager::sendLoginRequest(const UIManager& ui)
 {
     std::vector<char> packet;
 
-    auto write = [&](const void* data, size_t size)
-    {
+    auto write = [&](const void* data, size_t size) {
         const char* bytes = static_cast<const char*>(data);
         packet.insert(packet.end(), bytes, bytes + size);
     };
 
-    // 1. Serialize Username
-    uint32_t userLen = static_cast<uint32_t>(std::strlen(uiState.username));
+    uint32_t userLen = static_cast<uint32_t>(std::strlen(ui.username));
     write(&userLen, sizeof(userLen));
     if (userLen > 0)
-    {
-        write(uiState.username, userLen);
-    }
+        write(ui.username, userLen);
 
-    // 2. Serialize Password
-    uint32_t passLen = static_cast<uint32_t>(std::strlen(uiState.password));
+    uint32_t passLen = static_cast<uint32_t>(std::strlen(ui.password));
     write(&passLen, sizeof(passLen));
     if (passLen > 0)
-    {
-        write(uiState.password, passLen);
-    }
+        write(ui.password, passLen);
 
-    // 3. Send Packet Size followed by Packet Data
     uint32_t packetSize = static_cast<uint32_t>(packet.size());
 
-    if (!TCP_Send(reinterpret_cast<const char*>(&packetSize), sizeof(packetSize)))
+    if (!sendTCP(reinterpret_cast<const char*>(&packetSize), sizeof(packetSize)))
         return false;
 
-    if (!TCP_Send(packet.data(), static_cast<int>(packet.size())))
-        return false;
-
-    // 4. Wait for Server Handshake / Response
-    char responseByte = 0;
-    int bytesReceived = TCP_Receive(&responseByte, 1); // Blocks until server replies
-
-    // Returns true ONLY if response is received and equals 1 (Success)
-    return (bytesReceived > 0 && responseByte == 1);
+    return sendTCP(packet.data(), static_cast<int>(packet.size()));
 }
 
-// ==================================================
-// High-level UDP HELPER FUNCTIONS
-// ==================================================
-
-void UpdatePlayerPosition(float deltaTime)
+void NetworkManager::sendPlayerPosition(const MainPlayer& player, float deltaTime)
 {
     static float accumulator = 0.0f;
-
     accumulator += deltaTime;
 
     if (accumulator < 1.0f / 60.0f)
@@ -232,16 +181,14 @@ void UpdatePlayerPosition(float deltaTime)
     accumulator -= 1.0f / 60.0f;
 
     std::vector<char> packet;
-
-    auto write = [&](const void* data, size_t size)
-    {
+    auto write = [&](const void* data, size_t size) {
         const char* bytes = static_cast<const char*>(data);
         packet.insert(packet.end(), bytes, bytes + size);
     };
 
-    write(&mainPlayer.id, sizeof(mainPlayer.id));
-    write(&mainPlayer.position.x, sizeof(mainPlayer.position.x));
-    write(&mainPlayer.position.y, sizeof(mainPlayer.position.y));
+    write(&player.id, sizeof(player.id));
+    write(&player.position.x, sizeof(player.position.x));
+    write(&player.position.y, sizeof(player.position.y));
 
-    UDP_Send(packet.data(), static_cast<int>(packet.size()));
+    sendUDP(packet.data(), static_cast<int>(packet.size()));
 }

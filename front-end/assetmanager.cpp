@@ -1,8 +1,8 @@
+#include "core.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include "json.hpp"
-#include "core.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -15,8 +15,16 @@
 
 using json = nlohmann::json;
 
-static unsigned int LoadTextureToVRAM(const std::string& filePath) 
+unsigned int AssetManager::loadTexture(const std::string& filePath)
 {
+    if (filePath.empty()) return 0;
+
+    auto it = textureCache.find(filePath);
+    if (it != textureCache.end())
+    {
+        return it->second;
+    }
+
     std::vector<std::string> pathsToTry = {
         filePath,
         "assets/world/" + filePath,
@@ -27,19 +35,22 @@ static unsigned int LoadTextureToVRAM(const std::string& filePath)
     };
 
     int width = 0, height = 0, channels = 0;
-    stbi_set_flip_vertically_on_load(false); 
+    stbi_set_flip_vertically_on_load(false);
     unsigned char* data = nullptr;
     std::string resolvedPath = "";
 
-    for (const auto& path : pathsToTry) {
+    for (const auto& path : pathsToTry)
+    {
         data = stbi_load(path.c_str(), &width, &height, &channels, 4);
-        if (data) {
+        if (data)
+        {
             resolvedPath = path;
             break;
         }
     }
 
-    if (!data) {
+    if (!data)
+    {
         std::cerr << "[AssetManager Error] Could not find texture: " << filePath << std::endl;
         return 0;
     }
@@ -57,27 +68,33 @@ static unsigned int LoadTextureToVRAM(const std::string& filePath)
     stbi_image_free(data);
 
     std::cout << "[AssetManager] Uploaded '" << resolvedPath << "' (" << width << "x" << height << ") -> GPU ID: " << textureID << "\n";
+
+    textureCache[filePath] = textureID;
     return textureID;
 }
 
-void LoadWorldTextures(WorldStaticAssets& assets) 
+void AssetManager::loadWorldTextures(WorldStaticAssets& assets)
 {
-    for (std::size_t i = 0; i < assets.count; ++i) 
+    for (std::size_t i = 0; i < assets.count; ++i)
     {
-        if (!assets.texturePath[i].empty()) {
-            assets.textureID[i] = LoadTextureToVRAM(assets.texturePath[i]);
-        } else {
+        if (!assets.texturePath[i].empty())
+        {
+            assets.textureID[i] = loadTexture(assets.texturePath[i]);
+        }
+        else
+        {
             assets.textureID[i] = 0;
         }
     }
 }
 
-bool loadWorldStaticAssets(const std::string& filePath, WorldStaticAssets& outAssets) 
+bool AssetManager::loadWorldStaticAssets(const std::string& filePath, WorldStaticAssets& outAssets)
 {
     std::ifstream file(filePath);
     std::string loadedPath = filePath;
 
-    if (!file.is_open()) {
+    if (!file.is_open())
+    {
         std::vector<std::string> searchPaths = {
             filePath,
             "../" + filePath,
@@ -86,9 +103,11 @@ bool loadWorldStaticAssets(const std::string& filePath, WorldStaticAssets& outAs
             "assets/world/" + filePath,
             "../assets/world/" + filePath
         };
-        for (const auto& p : searchPaths) {
+        for (const auto& p : searchPaths)
+        {
             file.open(p);
-            if (file.is_open()) {
+            if (file.is_open())
+            {
                 loadedPath = p;
                 break;
             }
@@ -96,7 +115,8 @@ bool loadWorldStaticAssets(const std::string& filePath, WorldStaticAssets& outAs
         }
     }
 
-    if (!file.is_open()) {
+    if (!file.is_open())
+    {
         std::cerr << "[AssetManager Error] Could not open JSON file: " << filePath << std::endl;
         return false;
     }
@@ -104,9 +124,12 @@ bool loadWorldStaticAssets(const std::string& filePath, WorldStaticAssets& outAs
     std::cout << "[AssetManager] Loaded JSON file from: " << loadedPath << std::endl;
 
     json j;
-    try {
+    try
+    {
         file >> j;
-    } catch (const json::parse_error& e) {
+    }
+    catch (const json::parse_error& e)
+    {
         std::cerr << "JSON Parse Error: " << e.what() << "\n";
         return false;
     }
@@ -114,15 +137,18 @@ bool loadWorldStaticAssets(const std::string& filePath, WorldStaticAssets& outAs
     outAssets.count = 0;
     if (!j.is_array()) return false;
 
-    for (const auto& item : j) 
+    for (const auto& item : j)
     {
         if (outAssets.count >= MAX_ASSETS) break;
         std::size_t idx = outAssets.count;
 
-        if (item.contains("position") && item["position"].is_object()) {
+        if (item.contains("position") && item["position"].is_object())
+        {
             outAssets.position[idx].x = item["position"].value("x", 0.0f);
             outAssets.position[idx].y = item["position"].value("y", 0.0f);
-        } else {
+        }
+        else
+        {
             outAssets.position[idx].x = 0.0f;
             outAssets.position[idx].y = 0.0f;
         }
@@ -131,9 +157,12 @@ bool loadWorldStaticAssets(const std::string& filePath, WorldStaticAssets& outAs
         outAssets.meshId[idx] = item.value("meshId", 0);
         outAssets.type[idx]   = item.value("type", 1);
 
-        if (item.contains("textureId")) {
+        if (item.contains("textureId"))
+        {
             outAssets.texturePath[idx] = item.value("textureId", "");
-        } else {
+        }
+        else
+        {
             outAssets.texturePath[idx] = item.value("texturePath", "");
         }
 
@@ -143,7 +172,18 @@ bool loadWorldStaticAssets(const std::string& filePath, WorldStaticAssets& outAs
     return true;
 }
 
-void printWorldStaticAssets(const WorldStaticAssets& assets) 
+void AssetManager::unloadAll()
+{
+    for (auto& pair : textureCache)
+    {
+        GLuint id = pair.second;
+        glDeleteTextures(1, &id);
+    }
+    textureCache.clear();
+    std::cout << "[AssetManager] All GPU textures released.\n";
+}
+
+void AssetManager::printWorldStaticAssets(const WorldStaticAssets& assets) const
 {
     std::cout << "[AssetManager] Total Static Assets Parsed: " << assets.count << "\n";
 }

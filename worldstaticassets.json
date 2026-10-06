@@ -2,15 +2,15 @@
   {
     "type": 1,
     "meshId": 0,
-    "position": { "x": 0.0, "y": 100.0 },
+    "position": { "x": 0, "y": -50 },
     "scale": 1.4,
     "flags": [1, 2, 4, 16],
-    "textureId": "tree1.png"
+    "textureId": "spawn1.png"
   },
   {
     "type": 2,
     "meshId": 1,
-    "position": { "x": 80.0, "y": -40.0 },
+    "position": { "x": -220, "y": -80.0 },
     "scale": 1.2,
     "flags": [1, 2, 8, 16],
     "textureId": "tree1.png"
@@ -18,7 +18,7 @@
   {
     "type": 1,
     "meshId": 0,
-    "position": { "x": -90.0, "y": -60.0 },
+    "position": { "x": -280.0, "y": 240 },
     "scale": 1.5,
     "flags": [1, 2, 4, 16],
     "textureId": "tree1.png"

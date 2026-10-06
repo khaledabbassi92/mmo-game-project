@@ -12,100 +12,87 @@
 #include <GL/gl.h>
 #endif
 
-static SDL_Window* window = nullptr;
-static SDL_GLContext gl_context = nullptr;
-static Uint64 last_counter = 0;
-static float delta_time = 0.0f;
-static bool app_running = true;
-
-bool Renderer_Init(int width, int height, const char* title)
+bool Renderer::init(int width, int height, const char* title)
 {
     if (!SDL_Init(SDL_INIT_VIDEO))
     {
-        std::cerr << "SDL initialization failed: " << SDL_GetError() << std::endl;
+        std::cerr << "[SDL Error] Failed to initialize video: " << SDL_GetError() << std::endl;
         return false;
     }
 
-    // Use Compatibility profile so 2D immediate mode and ImGui run seamlessly
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
 
-    window = SDL_CreateWindow(title, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
-    if (!window)
+    SDL_Window* wnd = SDL_CreateWindow(title, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    if (!wnd)
     {
-        std::cerr << "Window creation failed: " << SDL_GetError() << std::endl;
-        SDL_Quit();
+        std::cerr << "[SDL Error] Failed to create window: " << SDL_GetError() << std::endl;
         return false;
     }
 
-    gl_context = SDL_GL_CreateContext(window);
-    if (!gl_context)
+    SDL_GLContext ctx = SDL_GL_CreateContext(wnd);
+    if (!ctx)
     {
-        std::cerr << "GL context creation failed: " << SDL_GetError() << std::endl;
-        SDL_DestroyWindow(window);
-        SDL_Quit();
+        std::cerr << "[SDL Error] Failed to create OpenGL context: " << SDL_GetError() << std::endl;
         return false;
     }
 
-    SDL_GL_MakeCurrent(window, gl_context);
-    SDL_GL_SetSwapInterval(1);
+    SDL_GL_MakeCurrent(wnd, ctx);
+    SDL_GL_SetSwapInterval(1); // VSync
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    ImGui::StyleColorsDark();
+    ImGui_ImplSDL3_InitForOpenGL(wnd, ctx);
+    ImGui_ImplOpenGL3_Init("#version 120");
 
-    if (!ImGui_ImplSDL3_InitForOpenGL(window, gl_context) || !ImGui_ImplOpenGL3_Init("#version 120"))
-    {
-        std::cerr << "ImGui initialization failed." << std::endl;
-        return false;
-    }
+    window = (void*)wnd;
+    gl_context = (void*)ctx;
+    last_counter = SDL_GetPerformanceCounter();
 
-    camera.width = static_cast<float>(width);
-    camera.height = static_cast<float>(height);
-    last_counter = SDL_GetTicksNS();
     return true;
 }
 
-bool Renderer_IsRunning()
+bool Renderer::isRunning(Camera& camera)
 {
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
         ImGui_ImplSDL3_ProcessEvent(&event);
-        if (event.type == SDL_EVENT_QUIT || 
-           (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window)))
+
+        if (event.type == SDL_EVENT_QUIT ||
+           (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && 
+            event.window.windowID == SDL_GetWindowID((SDL_Window*)window)))
         {
             app_running = false;
         }
+
+        if (event.type == SDL_EVENT_WINDOW_RESIZED)
+        {
+            camera.width = (float)event.window.data1;
+            camera.height = (float)event.window.data2;
+        }
     }
+
+    uint64_t current_counter = SDL_GetPerformanceCounter();
+    uint64_t frequency = SDL_GetPerformanceFrequency();
+    delta_time = static_cast<float>(current_counter - last_counter) / static_cast<float>(frequency);
+    last_counter = current_counter;
+
     return app_running;
 }
 
-void Renderer_BeginFrame()
+void Renderer::beginFrame(Camera& camera)
 {
-    Uint64 current_counter = SDL_GetTicksNS();
-    delta_time = (float)((double)(current_counter - last_counter) / 1000000000.0);
-    last_counter = current_counter;
+    glViewport(0, 0, (int)camera.width, (int)camera.height);
+    glClearColor(0.1f, 0.12f, 0.15f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    int drawableW = 0, drawableH = 0;
-    SDL_GetWindowSizeInPixels(window, &drawableW, &drawableH);
-    camera.width = (float)drawableW;
-    camera.height = (float)drawableH;
-
-    glViewport(0, 0, drawableW, drawableH);
-    glClearColor(28.0f / 255.0f, 42.0f / 255.0f, 26.0f / 255.0f, 1.0f); // Forest meadow dark green
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    // Set 2D Orthographic Projection in screen pixel space
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glOrtho(0.0, drawableW, drawableH, 0.0, -1.0, 1.0);
+    glOrtho(0.0, camera.width, camera.height, 0.0, -1.0, 1.0);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
@@ -114,42 +101,23 @@ void Renderer_BeginFrame()
     ImGui::NewFrame();
 }
 
-// Corrected Sprite Rendering: Applies Camera Transformation, Scaling & Anchor Point
-void Render_DrawSprite(unsigned int textureID, float worldX, float worldY, float scale)
+void Renderer::drawSprite(unsigned int textureID, float worldX, float worldY, float scale, const Camera& camera)
 {
-    // 1. World space to Screen space projection
     float screenX = (worldX - camera.position.x) * camera.zoom + (camera.width * 0.5f);
     float screenY = (worldY - camera.position.y) * camera.zoom + (camera.height * 0.5f);
 
     float baseW = 120.0f * scale * camera.zoom;
     float baseH = 160.0f * scale * camera.zoom;
 
-    // Anchor at trunk base (bottom-center)
     float left   = screenX - (baseW * 0.5f);
     float right  = screenX + (baseW * 0.5f);
     float bottom = screenY;
     float top    = screenY - baseH;
 
-    // Frustum Culling
+    // Screen frustum check
     if (right < 0 || left > camera.width || bottom < 0 || top > camera.height)
         return;
 
-    // 2. Drop Shadow under the tree
-    glDisable(GL_TEXTURE_2D);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glColor4f(0.0f, 0.0f, 0.0f, 0.35f);
-    
-    glBegin(GL_TRIANGLE_FAN);
-    glVertex2f(screenX, screenY);
-    for (int i = 0; i <= 16; ++i) {
-        float angle = i * (2.0f * 3.14159265f / 16.0f);
-        glVertex2f(screenX + std::cos(angle) * (baseW * 0.35f), 
-                   screenY + std::sin(angle) * (baseW * 0.15f));
-    }
-    glEnd();
-
-    // 3. Render Texture Quad if loaded
     if (textureID != 0)
     {
         glEnable(GL_TEXTURE_2D);
@@ -166,8 +134,8 @@ void Render_DrawSprite(unsigned int textureID, float worldX, float worldY, float
     }
     else
     {
-        // Procedural Fallback Quad so tree is NEVER invisible
-        glColor4f(0.3f, 0.18f, 0.08f, 1.0f); // Trunk
+        // Placeholder tree rendering if no texture loaded
+        glColor4f(0.3f, 0.18f, 0.08f, 1.0f);
         glBegin(GL_QUADS);
             glVertex2f(screenX - 8.0f * scale, bottom);
             glVertex2f(screenX + 8.0f * scale, bottom);
@@ -175,7 +143,7 @@ void Render_DrawSprite(unsigned int textureID, float worldX, float worldY, float
             glVertex2f(screenX - 8.0f * scale, bottom - baseH * 0.5f);
         glEnd();
 
-        glColor4f(0.18f, 0.55f, 0.22f, 1.0f); // Foliage
+        glColor4f(0.18f, 0.55f, 0.22f, 1.0f);
         glBegin(GL_TRIANGLES);
             glVertex2f(screenX, top);
             glVertex2f(left, bottom - baseH * 0.3f);
@@ -184,37 +152,100 @@ void Render_DrawSprite(unsigned int textureID, float worldX, float worldY, float
     }
 }
 
-void Renderer_EndFrame()
+void Renderer::renderWorld(const WorldStaticAssets& assets, const Camera& camera)
 {
-    switch (current_state)
+    for (std::size_t i = 0; i < assets.count; ++i)
     {
-        case GameState::Login:
-            DrawLoginWindow();
-            break;
-        case GameState::Playing:
-            world.renderWorld();
-            DrawHUD();
-            break;
-        case GameState::Options:
-            break;
+        drawSprite(assets.textureID[i], assets.position[i].x, assets.position[i].y, assets.scale[i], camera);
     }
-
-    ImGui::Render();
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-    SDL_GL_SwapWindow(window);
 }
 
-void Renderer_Shutdown()
+void Renderer::renderPlayer(const MainPlayer& player, const Camera& camera)
+{
+    if (!player.isAlive) return;
+
+    drawSprite(player.textureID, player.position.x, player.position.y, player.scale, camera);
+
+    float screenX = (player.position.x - camera.position.x) * camera.zoom + (camera.width * 0.5f);
+    float screenY = (player.position.y - camera.position.y) * camera.zoom + (camera.height * 0.5f);
+
+    ImGui::GetForegroundDrawList()->AddCircleFilled(
+        ImVec2(screenX, screenY),
+        12.0f * camera.zoom,
+        IM_COL32(0, 255, 100, 255)
+    );
+}
+
+// Renders complete scene (World + Player)
+void Renderer::renderScene(const WorldStaticAssets& assets, const MainPlayer& player, const Camera& camera)
+{
+    renderWorld(assets, camera);
+    renderPlayer(player, camera);
+}
+
+void Renderer::drawLoginWindow(UIManager& ui)
+{
+    ImGui::SetNextWindowPos(ImVec2(300, 200), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(300, 200), ImGuiCond_FirstUseEver);
+
+    ImGui::Begin("Login", nullptr, ImGuiWindowFlags_NoResize);
+
+    ImGui::InputText("Username", ui.username, sizeof(ui.username));
+    ImGui::InputText("Password", ui.password, sizeof(ui.password), ImGuiInputTextFlags_Password);
+
+    if (ImGui::Button("Connect"))
+    {
+        ui.connectPressed = true;
+    }
+
+    ImGui::End();
+}
+
+void Renderer::drawHUD(const MainPlayer& player, const Camera& camera, const WorldStaticAssets& assets)
+{
+    ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.5f);
+
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | 
+                             ImGuiWindowFlags_AlwaysAutoResize | 
+                             ImGuiWindowFlags_NoSavedSettings | 
+                             ImGuiWindowFlags_NoFocusOnAppearing | 
+                             ImGuiWindowFlags_NoNav | 
+                             ImGuiWindowFlags_NoMove;
+
+    if (ImGui::Begin("Player Position HUD", nullptr, flags))
+    {
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.4f, 1.0f), "PLAYER POSITION");
+        ImGui::Separator();
+        ImGui::Text("X: %.2f", player.position.x);
+        ImGui::Text("Y: %.2f", player.position.y);
+
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "CAMERA");
+        ImGui::Separator();
+        ImGui::Text("Cam X: %.2f", camera.position.x);
+        ImGui::Text("Cam Y: %.2f", camera.position.y);
+
+        ImGui::Spacing();
+        ImGui::Text("World Static Assets: %zu", assets.count);
+    }
+    ImGui::End();
+}
+
+void Renderer::endFrame()
+{
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    SDL_GL_SwapWindow((SDL_Window*)window);
+}
+
+void Renderer::shutdown()
 {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
-    SDL_GL_DestroyContext(gl_context);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
-}
 
-float Renderer_GetDeltaTime()
-{
-    return delta_time;
+    if (gl_context) SDL_GL_DestroyContext((SDL_GLContext)gl_context);
+    if (window) SDL_DestroyWindow((SDL_Window*)window);
+    SDL_Quit();
 }

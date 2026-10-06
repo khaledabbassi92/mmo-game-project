@@ -1,55 +1,89 @@
 #include "core.h"
 #include <iostream>
+#include <SDL3/SDL.h>
 
 int main(int argc, char* argv[])
 {
-    // Initialize graphics, SDL3 window, and OpenGL context
-    if (!Renderer_Init(1280, 720, "2D MMO Engine - Core Architecture"))
+    Renderer renderer;
+    GameContext game;
+
+    if (!renderer.init(1280, 720, "2D MMO Engine"))
     {
         std::cerr << "[Fatal Error] Failed to initialize rendering context." << std::endl;
         return -1;
     }
 
-    std::cout << "[Engine] Renderer and ImGui initialized successfully.\n";
-
-    // Load world static assets from JSON into core memory
-    if (loadWorldStaticAssets("worldstaticassets.json", Core_GetWorldAssets()))
+    if (game.assets.loadWorldStaticAssets("worldstaticassets.json", game.worldStaticAssets))
     {
-        printWorldStaticAssets(Core_GetWorldAssets());
-        LoadWorldTextures(Core_GetWorldAssets());
-        std::cout << "[Engine] World assets loaded successfully.\n";
-    }
-    else
-    {
-        std::cerr << "[Engine Warning] Failed to load worldstaticassets.json or file missing.\n";
+        game.assets.loadWorldTextures(game.worldStaticAssets);
     }
 
-    std::cout << "[Engine] Starting main loop...\n";
-
-    // Main Engine Loop
-    while (Renderer_IsRunning())
+    while (renderer.isRunning(game.camera))
     {
-        float deltaTime = Renderer_GetDeltaTime();
+        float deltaTime = renderer.getDeltaTime();
 
-        // 1. Core Logic Tick
-        Core_Update(deltaTime);
-
-        // 2. Handle State Transitions
-        if (Core_GetState() == GameState::Login)
+        // 1. STATE MACHINE & LOGIC UPDATE
+        switch (game.state)
         {
-            if (UI_IsConnectPressed())
+            case GameState::Login:
             {
-                Core_GetWorld().spawnWorld();
+                if (game.ui.isConnectPressed())
+                {
+                    game.world.spawnWorld(game.state); // Changes state to Playing
+                }
+                break;
+            }
+            case GameState::Playing:
+            {
+                // Check if ESCAPE key is pressed to exit gameplay back to Login
+                const bool* keyState = SDL_GetKeyboardState(NULL);
+                if (keyState[SDL_SCANCODE_ESCAPE])
+                {
+                    game.world.despawnWorld(game.state); // Despawns world & sets state to Login
+                }
+                else
+                {
+                    game.update(deltaTime);
+                }
+                break;
+            }
+            case GameState::Options:
+            {
+                break;
             }
         }
 
-        // 3. Render Pass
-        Renderer_BeginFrame();
-        Renderer_EndFrame();
+        // 2. RENDERING PASS
+        renderer.beginFrame(game.camera);
+
+        switch (game.state)
+        {
+            case GameState::Login:
+            {
+                renderer.drawLoginWindow(game.ui);
+                break;
+            }
+            case GameState::Playing:
+            {
+                if (game.world.world_isSpawned)
+                {
+                    renderer.renderScene(game.worldStaticAssets, game.mainPlayer, game.camera);
+                }
+                renderer.drawHUD(game.mainPlayer, game.camera, game.worldStaticAssets);
+                break;
+            }
+            case GameState::Options:
+            {
+                break;
+            }
+        }
+
+        renderer.endFrame();
     }
 
-    std::cout << "[Engine] Shutting down clean...\n";
-    Renderer_Shutdown();
+    game.assets.unloadAll();
+    game.net.shutdown();
+    renderer.shutdown();
 
     return 0;
 }
