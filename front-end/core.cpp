@@ -1,7 +1,7 @@
 #include "core.h"
 
 // -----------------------------------------------------------------------------
-// GLOBAL GAME OBJECT CONSTRUCTORS (Allocated once in VRAM/RAM here)
+// GLOBAL GAME OBJECT CONSTRUCTORS
 // -----------------------------------------------------------------------------
 GameState current_state = GameState::Login;
 World world;
@@ -10,7 +10,7 @@ Players players;
 Mobs mobs;
 WorldStaticAssets worldStaticAssets;
 MainPlayer mainPlayer = { 1, "Player1", {0.0f, 0.0f}, 1, 100, 100, 0, 0, true };
-UIState uiState; // Shared UI state for networking and systemui
+UIState uiState;
 
 // -----------------------------------------------------------------------------
 // GETTERS & SETTERS

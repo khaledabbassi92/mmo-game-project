@@ -20,10 +20,10 @@ struct Vector2 {
 };
 
 struct Camera {
-    Vector2 position;
-    float width;
-    float height;
-    float zoom;
+    Vector2 position = {0.0f, 0.0f};
+    float width = 1280.0f;
+    float height = 720.0f;
+    float zoom = 1.0f;
 };
 
 struct Player {
@@ -38,21 +38,20 @@ struct Player {
     bool isAlive;
 };
 
-using MainPlayer = Player;
-
-struct Players {
-    std::vector<Player> list;
-};
-
 struct Mob {
     int id;
+    char name[64];
     Vector2 position;
+    int level;
     int health;
+    int maxHealth;
+    bool isAlive;
 };
 
-struct Mobs {
-    std::vector<Mob> list;
-};
+// Container Type Aliases
+using MainPlayer = Player;
+using Players    = std::vector<Player>;
+using Mobs       = std::vector<Mob>;
 
 struct WorldStaticAssets {
     Vector2 position[MAX_ASSETS];
@@ -75,13 +74,13 @@ public:
 };
 
 struct UIState {
-    char username[128] = "";
+    char username[128] = "Player1";
     char password[128] = "";
     bool connectPressed = false;
     bool showOptions = false;
 };
 
-// Extern Declarations (Tells other files these objects exist in core.cpp)
+// Global Externs
 extern GameState current_state;
 extern Camera camera;
 extern Player mainPlayer;
@@ -103,7 +102,7 @@ MainPlayer& Core_GetMainPlayer();
 UIState& Core_GetUIState();
 void Core_Update(float deltaTime);
 
-// Renderer & Utility Declarations
+// Renderer
 bool Renderer_Init(int width, int height, const char* title);
 bool Renderer_IsRunning();
 void Renderer_BeginFrame();
@@ -112,11 +111,11 @@ void Renderer_Shutdown();
 void DrawHUD();
 float Renderer_GetDeltaTime();
 
+// Asset & Render Helpers
 bool loadWorldStaticAssets(const std::string& filePath, WorldStaticAssets& outAssets);
 void printWorldStaticAssets(const WorldStaticAssets& assets);
 void LoadWorldTextures(WorldStaticAssets& assets);
-
-void Render_DrawSprite(unsigned int textureID, float x, float y, float scale);
+void Render_DrawSprite(unsigned int textureID, float worldX, float worldY, float scale);
 void Render_WorldStaticAssets(const WorldStaticAssets& assets);
 
 void MainPlayer_Update(float deltaTime);

@@ -1,5 +1,7 @@
 #include "core.h"
 #include <iostream>
+#include <vector>
+#include <algorithm>
 
 void World::spawnWorld()
 {
@@ -19,22 +21,17 @@ void World::renderWorld()
 {
     if (!world_isSpawned) return;
 
-    // 1. Draw all static world assets loaded from JSON
+    // 1. Submit Static World Assets
     Render_WorldStaticAssets(worldStaticAssets);
 
-    // 2. Render dynamic entities (Player, Mobs, etc.)
+    // 2. Submit Player & Dynamic Entities
     MainPlayer_Render();
 }
 
-// Iterates over all parsed assets and submits GPU draw calls
 void Render_WorldStaticAssets(const WorldStaticAssets& assets)
 {
     for (std::size_t i = 0; i < assets.count; ++i)
     {
-        // Skip rendering if no texture was loaded to VRAM for this asset
-        if (assets.textureID[i] == 0) continue;
-
-        // Render quad at position (x, y) with scale
         Render_DrawSprite(
             assets.textureID[i],
             assets.position[i].x,
