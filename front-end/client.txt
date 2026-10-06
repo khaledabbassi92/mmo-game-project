@@ -1,0 +1,9 @@
+1.Send connection data
+
+2.Wait for Auth Response & Parse Ticket
+
+3.Transition & Game Server Handoff
+
+4.Load Assets & Acknowledge World Snapshot
+
+5.Enter Main Gameplay Loop

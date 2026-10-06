@@ -3,15 +3,7 @@
 #include <cstring>
 #include "imgui.h"
 
-struct UIState
-{
-    char username[128] = "";
-    char password[128] = "";
-    bool showOptions = false;
-    bool connectPressed = false;
-};
-
-static UIState uiState;
+UIState uiState;
 
 void DrawLoginWindow()
 {

@@ -1,11 +1,16 @@
 #include "core.h"
+#include <iostream>
 
+// Constructing game objects
 GameState current_state = GameState::Login;
 World world;
 Camera camera = { {0.0f, 0.0f}, 1280, 720, 1.0f };
 Players players;
 Mobs mobs;
-WorldAssets worldAssets;
+
+// Single static instance in memory
+WorldStaticAssets worldStaticAssets; 
+
 MainPlayer mainPlayer = { 1, "Player1", {0.0f, 0.0f}, 1, 100, 100, 0, 0, true };
 
 GameState Core_GetState() { return current_state; }
@@ -15,7 +20,10 @@ World& Core_GetWorld() { return world; }
 Camera& Core_GetCamera() { return camera; }
 Players& Core_GetPlayers() { return players; }
 Mobs& Core_GetMobs() { return mobs; }
-WorldAssets& Core_GetWorldAssets() { return worldAssets; }
+
+// Returns the single global WorldStaticAssets instance
+WorldStaticAssets& Core_GetWorldStaticAssets() { return worldStaticAssets; }
+
 MainPlayer& Core_GetMainPlayer() { return mainPlayer; }
 
 void Core_Update(float deltaTime)
@@ -24,6 +32,6 @@ void Core_Update(float deltaTime)
     {
         MainPlayer_Update(deltaTime);
         Camera_Update(deltaTime);
-
+        // Any static asset culling or processing can happen here!
     }
 }

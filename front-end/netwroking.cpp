@@ -4,14 +4,11 @@
 #include <vector>
 #include <cstdint>
 #include <iostream>
+#include <cstring>
 
 #include "core.h"
 
 #pragma comment(lib, "ws2_32.lib")
-
-// ==================================================
-// Winsock init / cleanup
-// ==================================================
 
 static bool winsockInitialized = false;
 
@@ -173,10 +170,10 @@ void UDP_Disconnect()
 }
 
 // ==================================================
-// High-level helpers
+// High-level TCP HELPER FUNCTIONS
 // ==================================================
 
-bool Addplayertoserver()
+bool SendLoginRequest()
 {
     std::vector<char> packet;
 
@@ -186,31 +183,42 @@ bool Addplayertoserver()
         packet.insert(packet.end(), bytes, bytes + size);
     };
 
-    write(&mainPlayer.id, sizeof(mainPlayer.id));
+    // 1. Serialize Username
+    uint32_t userLen = static_cast<uint32_t>(std::strlen(uiState.username));
+    write(&userLen, sizeof(userLen));
+    if (userLen > 0)
+    {
+        write(uiState.username, userLen);
+    }
 
-    uint32_t nameLength = static_cast<uint32_t>(mainPlayer.username.size());
-    write(&nameLength, sizeof(nameLength));
-    write(mainPlayer.username.data(), nameLength);
+    // 2. Serialize Password
+    uint32_t passLen = static_cast<uint32_t>(std::strlen(uiState.password));
+    write(&passLen, sizeof(passLen));
+    if (passLen > 0)
+    {
+        write(uiState.password, passLen);
+    }
 
-    write(&mainPlayer.position.x, sizeof(mainPlayer.position.x));
-    write(&mainPlayer.position.y, sizeof(mainPlayer.position.y));
-
-    write(&mainPlayer.level, sizeof(mainPlayer.level));
-    write(&mainPlayer.health, sizeof(mainPlayer.health));
-    write(&mainPlayer.maxHealth, sizeof(mainPlayer.maxHealth));
-    write(&mainPlayer.experience, sizeof(mainPlayer.experience));
-    write(&mainPlayer.animation, sizeof(mainPlayer.animation));
-
-    uint8_t connected = mainPlayer.connected ? 1 : 0;
-    write(&connected, sizeof(connected));
-
+    // 3. Send Packet Size followed by Packet Data
     uint32_t packetSize = static_cast<uint32_t>(packet.size());
 
     if (!TCP_Send(reinterpret_cast<const char*>(&packetSize), sizeof(packetSize)))
         return false;
 
-    return TCP_Send(packet.data(), static_cast<int>(packet.size()));
+    if (!TCP_Send(packet.data(), static_cast<int>(packet.size())))
+        return false;
+
+    // 4. Wait for Server Handshake / Response
+    char responseByte = 0;
+    int bytesReceived = TCP_Receive(&responseByte, 1); // Blocks until server replies
+
+    // Returns true ONLY if response is received and equals 1 (Success)
+    return (bytesReceived > 0 && responseByte == 1);
 }
+
+// ==================================================
+// High-level UDP HELPER FUNCTIONS
+// ==================================================
 
 void UpdatePlayerPosition(float deltaTime)
 {

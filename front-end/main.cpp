@@ -14,15 +14,26 @@ int main(int argc, char* argv[])
 
         if (UI_IsConnectPressed())
         {
-            if (TCP_Connect() && UDP_Connect() && Addplayertoserver())
+            // 1. Establish sockets
+            if ( 1 == 2)
             {
-                std::cout << "[Main] Registered. Spawning world." << std::endl;
+                std::cout << "Connect error" << std::endl;
+            }
+            // 2. Send credentials & wait for handshake
+            else if (!SendLoginRequest())
+            {
+                std::cout << "Authenticated. Spawning world." << std::endl;
+                loadWorldStaticAssets("worldstaticassets.json", worldStaticAssets);
+                printWorldStaticAssets(worldStaticAssets);
+                
                 world.spawnWorld();
+				
                 std::cout << "Current state: " << static_cast<int>(current_state) << std::endl;
             }
+            // 3. Handle auth failure
             else
             {
-                std::cerr << "[Main] Failed to connect/register. Staying on login." << std::endl;
+                std::cerr << "Authentication failed. Staying on login." << std::endl;
                 TCP_Disconnect();
                 UDP_Disconnect();
             }

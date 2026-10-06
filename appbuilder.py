@@ -37,80 +37,53 @@ cmd = [
     f"-I{frontend_dir}"
 ]
 
+# Separate lists to collect compiler flags vs linker flags
+include_flags = []
+source_files = []
+linker_flags = []
+
 # --------------------------------------------------
-# Libraries configuration
+# Dynamic Libraries Configuration
 # --------------------------------------------------
 
 libs_config = config.get("libraries", {})
 
-# --------------------------------------------------
-# SDL3
-# --------------------------------------------------
+for lib_name, lib_data in libs_config.items():
+    lib_dir = os.path.join(project_root, "libraries", lib_name)
+    
+    # Add Include Directory (-I)
+    inc_rel_path = lib_data.get("include", ".")
+    inc_full_path = os.path.normpath(os.path.join(lib_dir, inc_rel_path))
+    include_flags.append(f"-I{inc_full_path}")
 
-sdl3_cfg = libs_config.get("SDL3", {})
+    # Add ImGui Backends Include if imgui
+    if lib_name.lower() == "imgui":
+        backends_inc = os.path.join(lib_dir, "backends")
+        if os.path.exists(backends_inc):
+            include_flags.append(f"-I{backends_inc}")
 
-sdl3_inc = os.path.join(
-    project_root,
-    "libraries",
-    "SDL3",
-    sdl3_cfg.get("include", "include")
-)
+    # Add Source Files (.cpp)
+    for src in lib_data.get("source", []):
+        full_src = os.path.normpath(os.path.join(lib_dir, src))
+        source_files.append(full_src)
 
-sdl3_lib = os.path.join(
-    project_root,
-    "libraries",
-    "SDL3",
-    sdl3_cfg.get("lib", "lib")
-)
+    # Add Library Link Path (-L)
+    if "lib" in lib_data:
+        lib_path = os.path.normpath(os.path.join(lib_dir, lib_data["lib"]))
+        linker_flags.append(f"-L{lib_path}")
 
-cmd.append(f"-I{sdl3_inc}")
+    # Add Linker Flags (-l)
+    for lib_flag in lib_data.get("libraries", []):
+        linker_flags.append(f"-l{lib_flag}")
 
-# --------------------------------------------------
-# Dear ImGui
-# --------------------------------------------------
+# Default System Linkers
+default_system_libs = ["-lopengl32", "-lws2_32"]
 
-imgui_cfg = libs_config.get("imgui", {})
-
-imgui_inc = os.path.join(
-    project_root,
-    "libraries",
-    "imgui",
-    imgui_cfg.get("include", ".")
-)
-
-imgui_backends_inc = os.path.join(
-    project_root,
-    "libraries",
-    "imgui",
-    "backends"
-)
-
-cmd.append(f"-I{imgui_inc}")
-cmd.append(f"-I{imgui_backends_inc}")
-
-for src in imgui_cfg.get("source", []):
-    full_src = os.path.join(
-        project_root,
-        "libraries",
-        "imgui",
-        src
-    )
-    cmd.append(full_src)
-
-# --------------------------------------------------
-# SDL3 library directory & linker flags
-# --------------------------------------------------
-
-cmd.append(f"-L{sdl3_lib}")
-
-for lib in sdl3_cfg.get("libraries", []):
-    cmd.append(f"-l{lib}")
-
-if "opengl32" not in sdl3_cfg.get("libraries", []):
-    cmd.append("-lopengl32")
-
-if "ws2_32" not in sdl3_cfg.get("libraries", []):
-    cmd.append("-lws2_32")
+# Assemble command in correct order: Compiler -> Sources -> Includes -> Linker flags -> Output
+cmd.extend(source_files)
+cmd.extend(include_flags)
+cmd.extend(linker_flags)
+cmd.extend(default_system_libs)
 
 # --------------------------------------------------
 # Output executable
@@ -133,7 +106,7 @@ def build():
     print("Project root:", project_root)
 
     print("\nSource files:")
-    for src_file in frontend_source_files:
+    for src_file in frontend_source_files + source_files:
         print("  ->", src_file)
 
     print("\nCompiler command:\n", " ".join(cmd))

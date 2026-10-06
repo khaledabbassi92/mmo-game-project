@@ -1,0 +1,14 @@
+1.Verification and authentification
+Credential Validation
+Account Status Check
+
+2.Handshake
+Response Packet
+Game Server Reconnection
+
+3. Character & World Data Loading
+Character Selection / State Request
+World State Snapshot
+
+4. Transition to Live Loop
+Continuous Synchronization
